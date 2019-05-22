@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 - 2017 TopCoder Inc., All Rights Reserved.
+ * Copyright (C) 2010 - 2019 TopCoder Inc., All Rights Reserved.
  */
 package com.topcoder.direct.services.view.action.contest.launch;
 
@@ -21,6 +21,7 @@ import com.topcoder.direct.services.view.util.DirectUtils;
 import com.topcoder.direct.services.view.util.SessionData;
 import com.topcoder.management.deliverable.Submission;
 import com.topcoder.management.project.Prize;
+import com.topcoder.management.project.ProjectGroup;
 import com.topcoder.management.resource.Resource;
 import com.topcoder.management.resource.ResourceRole;
 import com.topcoder.security.TCSubject;
@@ -37,13 +38,7 @@ import org.apache.commons.lang.math.NumberUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <p>
@@ -272,6 +267,10 @@ import java.util.Map;
  * - add enable effort hours
  * </p>
  *
+ * Version 3.6 (Topcoder - Integrate Direct with Groups V5)
+ * <ul>
+ *     <li>Refactor projectGroup to comply with v5</li>
+ * </ul>
  * @author fabrizyo, FireIce, isv, morehappiness, GreatKevin, minhu, Veve, Ghost_141, GreatKevin, Veve, GreatKevin, TCSCODER
  * @version 3.5
  */
@@ -402,6 +401,11 @@ public class GetContestAction extends ContestAction {
     private boolean showSaveChallengeConfirmation;
 
     /**
+     * Endpoint to group of a user
+     */
+    private String userGroupsApiEndpoint;
+
+    /**
      * <p>
      * Creates a <code>GetContestAction</code> instance.
      * </p>
@@ -463,8 +467,24 @@ public class GetContestAction extends ContestAction {
         if (DirectUtils.isStudio(softwareCompetition)) {
             softwareCompetition.setType(CompetionType.STUDIO);
         }
-        softwareCompetition.getProjectHeader().setGroups(DirectUtils.getGroupIdAndName(
-                softwareCompetition.getProjectHeader().getGroups()));
+
+        List<ProjectGroup> projectGroups = DirectUtils.getGroupIdAndName(
+                softwareCompetition.getProjectHeader().getGroups());
+
+        if (this.type == TYPE.CONTEST_JSON) {
+            // get v5 id of groups
+            Set<Map<String, String>> projectGroupUser = DirectUtils.getGroups(DirectUtils.getTCSubjectFromSession(),
+                    userGroupsApiEndpoint);
+            for (ProjectGroup pg : projectGroups) {
+                for (Map<String, String> pgu : projectGroupUser) {
+                    if (String.valueOf(pg.getId()).equals(pgu.get("oldId"))) {
+                        pg.setNewId(pgu.get("id"));
+                        break;
+                    }
+                }
+            }
+        }
+        softwareCompetition.getProjectHeader().setGroups(projectGroups);
 
         setResult(softwareCompetition);
         regEndDate = DirectUtils.getDateString(DirectUtils.getRegistrationEndDate(softwareCompetition));
@@ -974,4 +994,11 @@ public class GetContestAction extends ContestAction {
         return showSaveChallengeConfirmation;
     }
 
+    public String getUserGroupsApiEndpoint() {
+        return userGroupsApiEndpoint;
+    }
+
+    public void setUserGroupsApiEndpoint(String userGroupsApiEndpoint) {
+        this.userGroupsApiEndpoint = userGroupsApiEndpoint;
+    }
 }
